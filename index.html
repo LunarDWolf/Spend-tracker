@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5bff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Spend Tracker</title>
+<style>
+:root{--bg:#f1f4f8;--surface:#fff;--ink:#0f1b2d;--muted:#5d6b80;--line:#dbe2ec;--accent:#2f5bff;--on:#fff;--bar:#e6ecf5;--danger:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1522;--surface:#162033;--ink:#e8edf5;--muted:#93a1b8;--line:#26344d;--accent:#6f8dff;--on:#0e1522;--bar:#22304a;--danger:#ff7b6b;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 8px}h2{font-size:1rem;margin:0 0 12px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);flex:1 1 140px}
+input,select,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+:is(input,select,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{cursor:pointer}
+button.primary{background:var(--accent);color:var(--on);border-color:var(--accent);font-weight:700}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;flex:1;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on);font-weight:700}
+.nav{display:flex;align-items:center;gap:8px;margin:12px 0}.nav strong{flex:1;text-align:center}
+.total{font-size:2.25rem;font-weight:700;line-height:1.1}
+.sub{color:var(--muted);font-size:.9rem}
+.cat{margin:10px 0}.cat .top{display:flex;justify-content:space-between;font-size:.92rem}
+.track{height:10px;background:var(--bar);border-radius:6px;overflow:hidden;margin-top:4px}
+.fill{height:100%;background:var(--accent);border-radius:6px}
+.over .fill{background:var(--danger)}
+.days{display:flex;align-items:flex-end;gap:3px;height:80px;margin-top:8px}
+.days div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+.daylbl{display:flex;gap:3px;font-size:.7rem;color:var(--muted)}.daylbl span{flex:1;text-align:center;overflow:hidden}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}
+li .meta{flex:1;min-width:0}li small{display:block;color:var(--muted)}li .amt{font-weight:700;white-space:nowrap}
+li button{min-height:36px;padding:4px 10px;color:var(--danger)}
+.empty{color:var(--muted);text-align:center;padding:12px 0}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bar .sub{flex:1 1 200px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Spend Tracker</h1>
+<div class="bar">
+  <span class="sub" id="sync">Saved on this device</span>
+  <button id="signin" type="button" class="primary" hidden>Sign in with Microsoft</button>
+  <button id="syncnow" type="button" hidden>Sync now</button>
+  <button id="signout" type="button" hidden>Sign out</button>
+</div>
+
+<section style="margin-top:16px" aria-label="Add expense">
+<h2>Add an expense</h2>
+<div class="row">
+<label>Amount (₹)<input id="amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="150"></label>
+<label>Category<select id="cat"></select></label>
+<label>Date<input id="date" type="date"></label>
+<label>Note (optional)<input id="note" type="text" maxlength="60" placeholder="Lunch, auto fare…"></label>
+<button class="primary" id="add" type="button" style="flex:1 1 100%">Add expense</button>
+</div>
+</section>
+
+<section aria-label="Summary">
+<div class="seg" role="group" aria-label="View">
+<button id="vw" type="button" aria-pressed="true">Week</button>
+<button id="vm" type="button" aria-pressed="false">Month</button>
+</div>
+<div class="nav"><button id="prev" type="button" aria-label="Previous">‹</button><strong id="range"></strong><button id="next" type="button" aria-label="Next">›</button></div>
+<div class="total" id="total">₹0</div>
+<div class="sub" id="avg"></div>
+<div class="days" id="days" aria-hidden="true"></div>
+<div class="daylbl" id="dl" aria-hidden="true"></div>
+<div id="bud" style="margin-top:12px"></div>
+</section>
+
+<section aria-label="By category"><h2>By category</h2><div id="cats"></div></section>
+<section aria-label="Expenses"><h2>Expenses in this period</h2><ul id="list"></ul></section>
+
+<section aria-label="Settings">
+<label>Monthly budget (₹), optional<input id="budget" type="number" inputmode="decimal" min="0" placeholder="e.g. 8000"></label>
+<button id="csv" type="button" style="margin-top:12px">Export all as CSV</button>
+</section>
+</main>
+
+<script>
+/* ===== Setup: paste your Application (client) ID from the Azure portal ===== */
+const CLIENT_ID="PASTE-YOUR-CLIENT-ID-HERE";
+/* ========================================================================== */
+const CATS=["Food","Transport","Supplements","Gym & gear","Study","Hostel","Health","Fun","Other"];
+const REDIRECT=location.origin+location.pathname.replace(/index\.html$/,"");
+const AUTH="https://login.microsoftonline.com/consumers/oauth2/v2.0/";
+const SCOPE="Files.ReadWrite.AppFolder offline_access";
+const FILE="https://graph.microsoft.com/v1.0/me/drive/special/approot:/expenses.json:/content";
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const ds=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const pd=s=>{const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
+const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
+const esc=t=>t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const jget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
+const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+let D=jget("st:data",{items:[],budget:0,budgetAt:0});
+let T=jget("st:tok",null),view="week",anchor=new Date(),busy=false,timer=null;
+const live=()=>D.items.filter(x=>!x.del);
+const saveLocal=()=>jset("st:data",D);
+const setSync=t=>$("sync").textContent=t;
+
+/* ---------- Microsoft sign-in (OAuth code flow with PKCE) ---------- */
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+async function login(){
+  const v=b64u(crypto.getRandomValues(new Uint8Array(32)));
+  const ch=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v)));
+  const st=b64u(crypto.getRandomValues(new Uint8Array(12)));
+  jset("st:pkce",{v,st});
+  location.href=AUTH+"authorize?"+new URLSearchParams({client_id:CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,response_mode:"query",scope:SCOPE,code_challenge:ch,code_challenge_method:"S256",state:st,prompt:"select_account"});
+}
+async function tokenReq(p){
+  const r=await fetch(AUTH+"token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:CLIENT_ID,scope:SCOPE,redirect_uri:REDIRECT,...p})});
+  const j=await r.json();
+  if(!r.ok)throw new Error(j.error_description||j.error||"Sign-in failed");
+  T={access:j.access_token,refresh:j.refresh_token||(T&&T.refresh),exp:Date.now()+j.expires_in*1000-60000};
+  jset("st:tok",T);
+}
+async function token(){
+  if(!T)return null;
+  if(Date.now()<T.exp)return T.access;
+  try{await tokenReq({grant_type:"refresh_token",refresh_token:T.refresh});return T.access}
+  catch(e){T=null;localStorage.removeItem("st:tok");ui();setSync("Signed out. Sign in again to keep syncing.");return null}
+}
+async function handleReturn(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has("code")&&!q.has("error"))return;
+  history.replaceState(null,"",REDIRECT);
+  const p=jget("st:pkce",{});localStorage.removeItem("st:pkce");
+  if(q.has("error")){setSync("Sign-in cancelled: "+(q.get("error_description")||q.get("error")));return}
+  if(q.get("state")!==p.st){setSync("Sign-in check failed. Try again.");return}
+  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),code_verifier:p.v})}
+  catch(e){setSync("Sign-in failed: "+e.message)}
+}
+
+/* ---------- OneDrive sync (one JSON file in the app's own folder) ---------- */
+async function pull(a){
+  const r=await fetch(FILE,{headers:{Authorization:"Bearer "+a}});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error("OneDrive replied "+r.status);
+  return r.json();
+}
+async function push(a){
+  const r=await fetch(FILE,{method:"PUT",headers:{Authorization:"Bearer "+a,"Content-Type":"application/json"},body:JSON.stringify(D)});
+  if(!r.ok)throw new Error("OneDrive replied "+r.status);
+}
+function merge(R){
+  const m=new Map(D.items.map(x=>[x.id,x]));
+  (R.items||[]).forEach(x=>{const y=m.get(x.id);if(!y||x.at>y.at)m.set(x.id,x)});
+  D.items=[...m.values()];
+  if((R.budgetAt||0)>(D.budgetAt||0)){D.budget=R.budget||0;D.budgetAt=R.budgetAt}
+}
+async function sync(){
+  if(busy||!T)return;
+  busy=true;setSync("Syncing…");
+  try{
+    const a=await token();if(!a)return;
+    const R=await pull(a);if(R)merge(R);
+    saveLocal();$("budget").value=D.budget||"";render();
+    await push(a);
+    setSync("Synced to OneDrive at "+new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"}));
+  }catch(e){setSync("Sync failed, saved on this device. "+e.message)}
+  finally{busy=false}
+}
+const queue=()=>{if(!T)return;clearTimeout(timer);timer=setTimeout(sync,1500)};
+function ui(){
+  const ok=CLIENT_ID.indexOf("PASTE")!==0;
+  $("signin").hidden=!ok||!!T;$("syncnow").hidden=!T;$("signout").hidden=!T;
+  if(!ok)setSync("Saved on this device. OneDrive sync isn’t set up yet (see README).");
+}
+
+/* ---------- Tracker ---------- */
+function period(){
+  const a=new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate());
+  if(view==="week"){const s=new Date(a);s.setDate(a.getDate()-(a.getDay()+6)%7);const e=new Date(s);e.setDate(s.getDate()+6);return[s,e]}
+  return[new Date(a.getFullYear(),a.getMonth(),1),new Date(a.getFullYear(),a.getMonth()+1,0)];
+}
+function render(){
+  const[s,e]=period(),a=ds(s),b=ds(e);
+  const fmt=d=>d.toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+  $("range").textContent=view==="week"?fmt(s)+" – "+fmt(e)+" "+e.getFullYear():s.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+  const items=live().filter(x=>x.date>=a&&x.date<=b).sort((x,y)=>y.date.localeCompare(x.date)||y.at-x.at);
+  const total=items.reduce((t,x)=>t+x.amount,0),nd=Math.round((e-s)/864e5)+1;
+  $("total").textContent=inr(total);
+  $("avg").textContent=items.length?inr(total/nd)+" per day · "+items.length+" expense"+(items.length>1?"s":""):"No expenses yet in this period";
+  const per=Array(nd).fill(0);items.forEach(x=>{per[Math.round((pd(x.date)-s)/864e5)]+=x.amount});
+  const mx=Math.max(...per,1);
+  $("days").innerHTML=per.map(v=>`<div style="height:${Math.max(v/mx*100,2)}%"></div>`).join("");
+  $("dl").innerHTML=per.map((_,i)=>{const d=new Date(s);d.setDate(s.getDate()+i);return`<span>${view==="week"?d.toLocaleDateString("en-IN",{weekday:"narrow"}):(i%5===0?d.getDate():"")}</span>`}).join("");
+  if(view==="month"&&D.budget>0){
+    const over=total>D.budget;
+    $("bud").className=over?"over":"";
+    $("bud").innerHTML=`<div class="sub" style="display:flex;justify-content:space-between"><span>Budget ${inr(D.budget)}</span><span>${over?inr(total-D.budget)+" over":inr(D.budget-total)+" left"}</span></div><div class="track"><div class="fill" style="width:${Math.min(total/D.budget*100,100)}%"></div></div>`;
+  }else $("bud").innerHTML="";
+  const by={};items.forEach(x=>by[x.cat]=(by[x.cat]||0)+x.amount);
+  const rows=Object.entries(by).sort((x,y)=>y[1]-x[1]);
+  $("cats").innerHTML=rows.length?rows.map(([c,v])=>`<div class="cat"><div class="top"><span>${esc(c)}</span><span>${inr(v)} · ${Math.round(v/total*100)}%</span></div><div class="track"><div class="fill" style="width:${v/total*100}%"></div></div></div>`).join(""):'<div class="empty">Add an expense to see the split.</div>';
+  $("list").innerHTML=items.length?items.map(x=>`<li><div class="meta">${esc(x.note||x.cat)}<small>${esc(x.cat)} · ${fmt(pd(x.date))}</small></div><span class="amt">${inr(x.amount)}</span><button type="button" data-id="${x.id}" aria-label="Delete expense">Delete</button></li>`).join(""):'<li class="empty" style="display:block">Nothing recorded for this period.</li>';
+  $("vw").setAttribute("aria-pressed",view==="week");$("vm").setAttribute("aria-pressed",view==="month");
+}
+function shift(n){
+  if(view==="week")anchor.setDate(anchor.getDate()+7*n);else anchor=new Date(anchor.getFullYear(),anchor.getMonth()+n,1);
+  render();
+}
+$("cat").innerHTML=CATS.map(c=>`<option>${esc(c)}</option>`).join("");
+$("date").value=ds(new Date());
+$("add").onclick=()=>{
+  const amount=parseFloat($("amt").value);
+  if(!(amount>0)){$("amt").focus();return}
+  const date=$("date").value||ds(new Date());
+  const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2));
+  D.items.push({id,amount,cat:$("cat").value,date,note:$("note").value.trim(),at:Date.now()});
+  saveLocal();$("amt").value="";$("note").value="";anchor=pd(date);render();$("amt").focus();queue();
+};
+$("list").onclick=e=>{
+  const b=e.target.closest("button[data-id]");if(!b)return;
+  const x=D.items.find(i=>i.id===b.dataset.id);if(x){x.del=true;x.at=Date.now()}
+  saveLocal();render();queue();
+};
+$("budget").onchange=()=>{D.budget=Math.max(parseFloat($("budget").value)||0,0);D.budgetAt=Date.now();saveLocal();render();queue()};
+$("vw").onclick=()=>{view="week";render()};$("vm").onclick=()=>{view="month";render()};
+$("prev").onclick=()=>shift(-1);$("next").onclick=()=>shift(1);
+$("signin").onclick=login;$("syncnow").onclick=sync;
+$("signout").onclick=()=>{T=null;localStorage.removeItem("st:tok");ui();setSync("Signed out. Your data is still saved on this device.")};
+$("csv").onclick=()=>{
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const rows=["Date,Amount,Category,Note",...live().sort((x,y)=>x.date.localeCompare(y.date)).map(x=>[x.date,x.amount,q(x.cat),q(x.note||"")].join(","))];
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.join("\n")],{type:"text/csv"}));a.download="expenses.csv";a.click();
+};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+$("budget").value=D.budget||"";
+render();ui();
+handleReturn().then(()=>{T=jget("st:tok",null);ui();sync()});
+</script>
+</body>
+</html>

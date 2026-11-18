@@ -49,6 +49,7 @@ li button{min-height:36px;padding:4px 10px;color:var(--danger)}
 <div class="bar">
   <span class="sub" id="sync">Saved on this device</span>
   <button id="signin" type="button" class="primary" hidden>Sign in with Microsoft</button>
+  <button id="gsignin" type="button" class="primary" hidden>Sign in with Google</button>
   <button id="syncnow" type="button" hidden>Sync now</button>
   <button id="signout" type="button" hidden>Sign out</button>
 </div>
@@ -86,9 +87,11 @@ li button{min-height:36px;padding:4px 10px;color:var(--danger)}
 </section>
 </main>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 /* ===== Setup: paste your Application (client) ID from the Azure portal ===== */
-const CLIENT_ID="f01dce07-7aed-4e6d-bb68-1ec787ba8ccd";
+const CLIENT_ID="PASTE-YOUR-CLIENT-ID-HERE";
+const G_CLIENT_ID="PASTE-YOUR-GOOGLE-CLIENT-ID-HERE";
 /* ========================================================================== */
 const CATS=["Food","Transport","Supplements","Gym & gear","Study","Hostel","Health","Fun","Other"];
 const REDIRECT=location.origin+location.pathname.replace(/index\.html$/,"");
@@ -105,7 +108,7 @@ const jget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){re
 const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 
 let D=jget("st:data",{items:[],budget:0,budgetAt:0});
-let T=jget("st:tok",null),view="week",anchor=new Date(),busy=false,timer=null;
+let T=jget("st:tok",null),G=jget("st:gtok",null),P=localStorage.getItem("st:prov")||(T?"ms":""),view="week",anchor=new Date(),busy=false,timer=null;
 const live=()=>D.items.filter(x=>!x.del);
 const saveLocal=()=>jset("st:data",D);
 const setSync=t=>$("sync").textContent=t;
@@ -126,11 +129,11 @@ async function tokenReq(p){
   T={access:j.access_token,refresh:j.refresh_token||(T&&T.refresh),exp:Date.now()+j.expires_in*1000-60000};
   jset("st:tok",T);
 }
-async function token(){
+async function msToken(){
   if(!T)return null;
   if(Date.now()<T.exp)return T.access;
   try{await tokenReq({grant_type:"refresh_token",refresh_token:T.refresh});return T.access}
-  catch(e){T=null;localStorage.removeItem("st:tok");ui();setSync("Signed out. Sign in again to keep syncing.");return null}
+  catch(e){T=null;P="";localStorage.removeItem("st:tok");localStorage.removeItem("st:prov");ui();setSync("Signed out. Sign in again to keep syncing.");return null}
 }
 async function handleReturn(){
   const q=new URLSearchParams(location.search);
@@ -139,21 +142,64 @@ async function handleReturn(){
   const p=jget("st:pkce",{});localStorage.removeItem("st:pkce");
   if(q.has("error")){setSync("Sign-in cancelled: "+(q.get("error_description")||q.get("error")));return}
   if(q.get("state")!==p.st){setSync("Sign-in check failed. Try again.");return}
-  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),code_verifier:p.v})}
+  try{await tokenReq({grant_type:"authorization_code",code:q.get("code"),code_verifier:p.v});P="ms";localStorage.setItem("st:prov","ms")}
   catch(e){setSync("Sign-in failed: "+e.message)}
 }
 
 /* ---------- OneDrive sync (one JSON file in the app's own folder) ---------- */
-async function pull(a){
+async function msPull(a){
   const r=await fetch(FILE,{headers:{Authorization:"Bearer "+a}});
   if(r.status===404)return null;
   if(!r.ok)throw new Error("OneDrive replied "+r.status);
   return r.json();
 }
-async function push(a){
+async function msPush(a){
   const r=await fetch(FILE,{method:"PUT",headers:{Authorization:"Bearer "+a,"Content-Type":"application/json"},body:JSON.stringify(D)});
   if(!r.ok)throw new Error("OneDrive replied "+r.status);
 }
+/* ---------- Google Drive (hidden app-data folder) ---------- */
+let gc=null,gres=null,grej=null;
+function gAuth(interactive){return new Promise((res,rej)=>{
+  if(!window.google||!google.accounts){rej(new Error("Google sign-in didn’t load. Check your connection."));return}
+  gres=res;grej=rej;
+  gc=gc||google.accounts.oauth2.initTokenClient({client_id:G_CLIENT_ID,scope:"https://www.googleapis.com/auth/drive.appdata",
+    callback:r=>{if(r.error){grej(new Error(r.error_description||r.error));return}
+      G={access:r.access_token,exp:Date.now()+r.expires_in*1000-60000};jset("st:gtok",G);gres(G.access)},
+    error_callback:e=>grej(new Error(e.type||"Google sign-in was cancelled"))});
+  gc.requestAccessToken({prompt:interactive?"select_account":""});
+})}
+async function gToken(){
+  if(G&&Date.now()<G.exp)return G.access;
+  ui();setSync("Google session ended. Tap Reconnect Google to keep syncing.");return null;
+}
+async function gFileId(a){
+  let id=localStorage.getItem("st:gfid");if(id)return id;
+  const r=await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent("name='expenses.json'"),{headers:{Authorization:"Bearer "+a}});
+  if(!r.ok)throw new Error("Google Drive replied "+r.status);
+  const j=await r.json();id=j.files&&j.files[0]&&j.files[0].id;
+  if(id)localStorage.setItem("st:gfid",id);return id||null;
+}
+async function gPull(a){
+  const id=await gFileId(a);if(!id)return null;
+  const r=await fetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media",{headers:{Authorization:"Bearer "+a}});
+  if(r.status===404){localStorage.removeItem("st:gfid");return null}
+  if(!r.ok)throw new Error("Google Drive replied "+r.status);return r.json();
+}
+async function gPush(a){
+  const id=await gFileId(a),body=JSON.stringify(D);let r;
+  if(id){
+    r=await fetch("https://www.googleapis.com/upload/drive/v3/files/"+id+"?uploadType=media",{method:"PATCH",headers:{Authorization:"Bearer "+a,"Content-Type":"application/json"},body});
+    if(r.status===404)localStorage.removeItem("st:gfid");
+  }else{
+    const bd="sp"+Date.now(),m=`--${bd}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({name:"expenses.json",parents:["appDataFolder"]})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`;
+    r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{Authorization:"Bearer "+a,"Content-Type":"multipart/related; boundary="+bd},body:m});
+    if(r.ok){localStorage.setItem("st:gfid",(await r.json()).id);return}
+  }
+  if(!r.ok)throw new Error("Google Drive replied "+r.status);
+}
+const token=()=>P==="g"?gToken():msToken();
+const pull=a=>P==="g"?gPull(a):msPull(a);
+const push=a=>P==="g"?gPush(a):msPush(a);
 function merge(R){
   const m=new Map(D.items.map(x=>[x.id,x]));
   (R.items||[]).forEach(x=>{const y=m.get(x.id);if(!y||x.at>y.at)m.set(x.id,x)});
@@ -161,22 +207,25 @@ function merge(R){
   if((R.budgetAt||0)>(D.budgetAt||0)){D.budget=R.budget||0;D.budgetAt=R.budgetAt}
 }
 async function sync(){
-  if(busy||!T)return;
+  if(busy||!P)return;
   busy=true;setSync("Syncing…");
   try{
     const a=await token();if(!a)return;
     const R=await pull(a);if(R)merge(R);
     saveLocal();$("budget").value=D.budget||"";render();
     await push(a);
-    setSync("Synced to OneDrive at "+new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"}));
+    setSync("Synced to "+(P==="g"?"Google Drive":"OneDrive")+" at "+new Date().toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"}));
   }catch(e){setSync("Sync failed, saved on this device. "+e.message)}
   finally{busy=false}
 }
-const queue=()=>{if(!T)return;clearTimeout(timer);timer=setTimeout(sync,1500)};
+const queue=()=>{if(!P)return;clearTimeout(timer);timer=setTimeout(sync,1500)};
 function ui(){
-  const ok=CLIENT_ID.indexOf("PASTE")!==0;
-  $("signin").hidden=!ok||!!T;$("syncnow").hidden=!T;$("signout").hidden=!T;
-  if(!ok)setSync("Saved on this device. OneDrive sync isn’t set up yet (see README).");
+  const ok=CLIENT_ID.indexOf("PASTE")!==0,gok=G_CLIENT_ID.indexOf("PASTE")!==0;
+  const gExp=P==="g"&&(!G||Date.now()>=G.exp);
+  $("signin").hidden=!ok||!!P;
+  $("gsignin").hidden=!gok||(!!P&&!gExp);$("gsignin").textContent=gExp?"Reconnect Google":"Sign in with Google";
+  $("syncnow").hidden=!P;$("signout").hidden=!P;
+  if(!ok&&!gok)setSync("Saved on this device. Cloud sync isn’t set up yet (see README).");
 }
 
 /* ---------- Tracker ---------- */
@@ -230,8 +279,9 @@ $("list").onclick=e=>{
 $("budget").onchange=()=>{D.budget=Math.max(parseFloat($("budget").value)||0,0);D.budgetAt=Date.now();saveLocal();render();queue()};
 $("vw").onclick=()=>{view="week";render()};$("vm").onclick=()=>{view="month";render()};
 $("prev").onclick=()=>shift(-1);$("next").onclick=()=>shift(1);
-$("signin").onclick=login;$("syncnow").onclick=sync;
-$("signout").onclick=()=>{T=null;localStorage.removeItem("st:tok");ui();setSync("Signed out. Your data is still saved on this device.")};
+$("signin").onclick=login;
+$("gsignin").onclick=async()=>{try{await gAuth(true);P="g";localStorage.setItem("st:prov","g");ui();sync()}catch(e){setSync("Google sign-in failed: "+e.message)}};$("syncnow").onclick=sync;
+$("signout").onclick=()=>{T=null;G=null;P="";["st:tok","st:gtok","st:prov","st:gfid"].forEach(k=>localStorage.removeItem(k));ui();setSync("Signed out. Your data is still saved on this device.")};
 $("csv").onclick=()=>{
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
   const rows=["Date,Amount,Category,Note",...live().sort((x,y)=>x.date.localeCompare(y.date)).map(x=>[x.date,x.amount,q(x.cat),q(x.note||"")].join(","))];

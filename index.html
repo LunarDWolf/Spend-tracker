@@ -132,6 +132,16 @@ const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let D=jget("st:data",{items:[],budget:0,budgetAt:0});
 let T=jget("st:tok",null),G=jget("st:gtok",null),P=localStorage.getItem("st:prov")||(T?"ms":""),view="week",anchor=new Date(),busy=false,timer=null;
 const live=()=>D.items.filter(x=>!x.del);
+let CAN={};
+function canon(){CAN={};const base={};CATS.forEach(c=>base[c.toLowerCase()]=c);
+  live().slice().sort((a,b)=>a.at-b.at).forEach(x=>{if(x.cat==="Other"&&x.name){const k=x.name.trim().toLowerCase();if(!CAN[k])CAN[k]=base[k]||x.name.trim()}})}
+const ecat=x=>x.cat==="Other"&&x.name?(CAN[x.name.trim().toLowerCase()]||x.name.trim()):x.cat;
+function catList(){canon();const cu=[...new Set(live().map(ecat))].filter(c=>!CATS.includes(c)).sort((a,b)=>a.localeCompare(b));return[...CATS.filter(c=>c!=="Other"),...cu,"Other"]}
+function fillCats(){
+  const cur=$("cat").value,cu=catList().filter(c=>!CATS.includes(c));
+  $("cat").innerHTML=CATS.filter(c=>c!=="Other").map(c=>`<option>${esc(c)}</option>`).join("")+cu.map(c=>`<option value="custom:${esc(c)}">${esc(c)}</option>`).join("")+'<option value="Other">Other (type a new name)</option>';
+  if([...$("cat").options].some(o=>o.value===cur))$("cat").value=cur;
+}
 const saveLocal=()=>jset("st:data",D);
 const setSync=t=>$("sync").textContent=t;
 
@@ -247,7 +257,7 @@ function ui(){
   $("signin").hidden=!ok||!!P;
   $("gsignin").hidden=!gok||(!!P&&!gExp);$("gsignin").textContent=gExp?"Reconnect Google":"Sign in with Google";
   $("syncnow").hidden=!P;$("signout").hidden=!P;
-  if(!ok&&!gok)setSync("Saved on this device. Cloud sync isn’t set up yet (see README).");
+  if(!ok&&!gok)setSync(window.APP?"Saved on this device. No client IDs found in config.js yet.":"Saved on this device. config.js wasn’t found next to index.html.");
 }
 
 /* ---------- Tracker ---------- */
@@ -257,6 +267,7 @@ function period(){
   return[new Date(a.getFullYear(),a.getMonth(),1),new Date(a.getFullYear(),a.getMonth()+1,0)];
 }
 function render(){
+  fillCats();
   const[s,e]=period(),a=ds(s),b=ds(e);
   const fmt=d=>d.toLocaleDateString("en-IN",{day:"numeric",month:"short"});
   $("range").textContent=view==="week"?fmt(s)+" – "+fmt(e)+" "+e.getFullYear():s.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
@@ -269,10 +280,10 @@ function render(){
   $("days").innerHTML=per.map(v=>`<div style="height:${Math.max(v/mx*100,2)}%"></div>`).join("");
   $("dl").innerHTML=per.map((_,i)=>{const d=new Date(s);d.setDate(s.getDate()+i);return`<span>${view==="week"?d.toLocaleDateString("en-IN",{weekday:"narrow"}):(i%5===0?d.getDate():"")}</span>`}).join("");
   renderBudget();
-  const by={};items.forEach(x=>by[x.cat]=(by[x.cat]||0)+x.amount);
+  const by={};items.forEach(x=>by[ecat(x)]=(by[ecat(x)]||0)+x.amount);
   const rows=Object.entries(by).sort((x,y)=>y[1]-x[1]);
   $("cats").innerHTML=rows.length?rows.map(([c,v])=>`<div class="cat"><div class="top"><span>${esc(c)}</span><span>${inr(v)} · ${Math.round(v/total*100)}%</span></div><div class="track"><div class="fill" style="width:${v/total*100}%"></div></div></div>`).join(""):'<div class="empty">Add an expense to see the split.</div>';
-  $("list").innerHTML=items.length?items.map(x=>`<li><div class="meta"><b>${esc(x.cat==="Other"&&x.name?x.name:x.cat)}</b><small>${x.cat==="Other"&&x.name?"Other · ":""}${fmt(pd(x.date))}</small>${x.note?`<small class="rem">${esc(x.note)}</small>`:""}</div><span class="amt">${inr(x.amount)}</span><button type="button" data-id="${x.id}" aria-label="Delete expense">Delete</button></li>`).join(""):'<li class="empty" style="display:block">Nothing recorded for this period.</li>';
+  $("list").innerHTML=items.length?items.map(x=>`<li><div class="meta"><b>${esc(ecat(x))}</b><small>${fmt(pd(x.date))}</small>${x.note?`<small class="rem">${esc(x.note)}</small>`:""}</div><span class="amt">${inr(x.amount)}</span><button type="button" data-id="${x.id}" aria-label="Delete expense">Delete</button></li>`).join(""):'<li class="empty" style="display:block">Nothing recorded for this period.</li>';
   $("vw").setAttribute("aria-pressed",view==="week");$("vm").setAttribute("aria-pressed",view==="month");
 }
 function renderBudget(){
@@ -288,14 +299,14 @@ function shift(n){
   if(view==="week")anchor.setDate(anchor.getDate()+7*n);else anchor=new Date(anchor.getFullYear(),anchor.getMonth()+n,1);
   render();
 }
-$("cat").innerHTML=CATS.map(c=>`<option>${esc(c)}</option>`).join("");
 $("date").value=ds(new Date());
 $("cat").onchange=()=>{const o=$("cat").value==="Other";$("namewrap").hidden=!o;if(o)$("cname").focus()};
 $("add").onclick=()=>{
-  const amount=parseFloat($("amt").value),cat=$("cat").value,name=$("cname").value.trim();
+  const cv=$("cat").value,amount=parseFloat($("amt").value);let cat=cv,name=$("cname").value.trim();
+  if(cv.startsWith("custom:")){cat="Other";name=cv.slice(7)}
   if(!(amount>0)){$("amt").focus();return}
-  $("cname").classList.toggle("bad",cat==="Other"&&!name);
-  if(cat==="Other"&&!name){$("cname").focus();return}
+  $("cname").classList.toggle("bad",cv==="Other"&&!name);
+  if(cv==="Other"&&!name){$("cname").focus();return}
   const date=$("date").value||ds(new Date());
   const id=(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2));
   const it={id,amount,cat,date,note:$("note").value.trim(),at:Date.now()};
@@ -316,8 +327,9 @@ $("signin").onclick=login;
 $("gsignin").onclick=async()=>{try{await gAuth(true);P="g";localStorage.setItem("st:prov","g");ui();sync()}catch(e){setSync("Google sign-in failed: "+e.message)}};$("syncnow").onclick=sync;
 $("signout").onclick=()=>{T=null;G=null;P="";["st:tok","st:gtok","st:prov","st:gfid"].forEach(k=>localStorage.removeItem(k));ui();setSync("Signed out. Your data is still saved on this device.")};
 $("csv").onclick=()=>{
+  canon();
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const rows=["Date,Amount,Category,Name,Remarks",...live().sort((x,y)=>x.date.localeCompare(y.date)).map(x=>[x.date,x.amount,q(x.cat),q(x.name||""),q(x.note||"")].join(","))];
+  const rows=["Date,Amount,Category,Remarks",...live().sort((x,y)=>x.date.localeCompare(y.date)).map(x=>[x.date,x.amount,q(ecat(x)),q(x.note||"")].join(","))];
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.join("\n")],{type:"text/csv"}));a.download="expenses.csv";a.click();
 };
 /* ---------- Exports ---------- */
@@ -326,9 +338,9 @@ function pdfReport(){
   const[s,e]=period(),a=ds(s),b=ds(e),nd=Math.round((e-s)/864e5)+1;
   const items=live().filter(x=>x.date>=a&&x.date<=b).sort((x,y)=>x.date.localeCompare(y.date));
   const total=items.reduce((t,x)=>t+x.amount,0);
-  const by={};items.forEach(x=>by[x.cat]=(by[x.cat]||0)+x.amount);
+  const by={};items.forEach(x=>by[ecat(x)]=(by[ecat(x)]||0)+x.amount);
   const rows=Object.entries(by).sort((x,y)=>y[1]-x[1]);
-  const col=c=>PAL[Math.max(CATS.indexOf(c),0)];
+  const L=catList(),col=c=>PAL[Math.max(L.indexOf(c),0)%PAL.length];
   const f=d=>d.toLocaleDateString("en-IN",{day:"numeric",month:"short"});
   const title=view==="week"?"Weekly report: "+f(s)+" – "+f(e)+" "+e.getFullYear():"Monthly report: "+s.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
   const C=2*Math.PI*40;let off=0;
@@ -351,22 +363,22 @@ function pdfReport(){
   <div style="display:flex;gap:24px;align-items:center"><svg viewBox="0 0 120 120" width="170" height="170">${arcs}</svg><div style="flex:1">${rows.map(([c,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0"><span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${col(c)};margin-right:8px"></span>${esc(c)}</span><span>${inr(v)} · ${Math.round(v/total*100)}%</span></div>`).join("")}</div></div>
   <h2 style="font-size:15px;margin:20px 0 6px">All expenses</h2>
   <table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="text-align:left;background:#e6ecf5"><th style="${td}">Date</th><th style="${td}">Expense</th><th style="${td}">Remarks</th><th style="${td};text-align:right">Amount</th></tr>
-  ${items.map(x=>`<tr><td style="${td}">${f(pd(x.date))}</td><td style="${td}">${esc(x.cat==="Other"&&x.name?x.name+" (Other)":x.cat)}</td><td style="${td};color:#555;font-style:italic">${esc(x.note||"")}</td><td style="${td};text-align:right">${inr(x.amount)}</td></tr>`).join("")}</table>`:'<p style="margin-top:20px;color:#555">No expenses in this period.</p>'}`;
+  ${items.map(x=>`<tr><td style="${td}">${f(pd(x.date))}</td><td style="${td}">${esc(ecat(x))}</td><td style="${td};color:#555;font-style:italic">${esc(x.note||"")}</td><td style="${td};text-align:right">${inr(x.amount)}</td></tr>`).join("")}</table>`:'<p style="margin-top:20px;color:#555">No expenses in this period.</p>'}`;
   setSync("Choose “Save as PDF” in the print screen.");
   setTimeout(()=>window.print(),100);
 }
 async function xlsx(){
   try{
     if(!window.XLSX)await new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="xlsx.full.min.js";sc.onload=res;sc.onerror=()=>rej(new Error("The Excel add-on didn’t load. Connect to the internet and try again."));document.head.appendChild(sc)});
-    const items=live().sort((x,y)=>x.date.localeCompare(y.date)),wb=XLSX.utils.book_new();
+    const L=catList(),items=live().sort((x,y)=>x.date.localeCompare(y.date)),wb=XLSX.utils.book_new();
     const add=(rows,name,w)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(n=>({wch:n}));XLSX.utils.book_append_sheet(wb,ws,name)};
-    add([["Date","Amount (₹)","Category","Name","Remarks"],...items.map(x=>[x.date,x.amount,x.cat,x.name||"",x.note||""])],"Expenses",[12,12,16,22,40]);
+    add([["Date","Amount (₹)","Category","Remarks"],...items.map(x=>[x.date,x.amount,ecat(x),x.note||""])],"Expenses",[12,12,22,40]);
     const wkey=d=>{const t=pd(d);t.setDate(t.getDate()-(t.getDay()+6)%7);return ds(t)};
     const pivot=(label,kf,bud)=>{
-      const keys=[...new Set(items.map(x=>kf(x.date)))].sort(),hd=[label,...CATS,"Total"];if(bud)hd.push("Budget","Left");
-      return[hd,...keys.map(k=>{const m=items.filter(x=>kf(x.date)===k),r=[k,...CATS.map(c=>m.filter(x=>x.cat===c).reduce((t,x)=>t+x.amount,0))],t=m.reduce((q,x)=>q+x.amount,0);r.push(t);if(bud)r.push(D.budget,D.budget-t);return r})]};
-    add(pivot("Month",d=>d.slice(0,7),D.budget>0),"Monthly",[12,...CATS.map(()=>13),12,12,12]);
-    add(pivot("Week starting (Mon)",wkey,false),"Weekly",[20,...CATS.map(()=>13),12]);
+      const keys=[...new Set(items.map(x=>kf(x.date)))].sort(),hd=[label,...L,"Total"];if(bud)hd.push("Budget","Left");
+      return[hd,...keys.map(k=>{const m=items.filter(x=>kf(x.date)===k),r=[k,...L.map(c=>m.filter(x=>ecat(x)===c).reduce((t,x)=>t+x.amount,0))],t=m.reduce((q,x)=>q+x.amount,0);r.push(t);if(bud)r.push(D.budget,D.budget-t);return r})]};
+    add(pivot("Month",d=>d.slice(0,7),D.budget>0),"Monthly",[12,...L.map(()=>13),12,12,12]);
+    add(pivot("Week starting (Mon)",wkey,false),"Weekly",[20,...L.map(()=>13),12]);
     XLSX.writeFile(wb,"spend-tracker.xlsx");
     setSync("Excel file downloaded.");
   }catch(err){setSync(err.message)}

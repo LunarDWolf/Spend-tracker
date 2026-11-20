@@ -117,7 +117,12 @@ input[type=color]{width:44px;height:36px;min-height:36px;padding:2px;border-radi
 <div class="seg" role="group" aria-label="Theme"><button id="th-light" type="button" aria-pressed="false">Light</button><button id="th-dark" type="button" aria-pressed="false">Dark</button><button id="th-system" type="button" aria-pressed="true">System</button></div></div>
 <div><div class="sub" style="margin-bottom:8px">Accent colour</div>
 <div class="sw" id="sw"></div>
-<div class="row" style="margin-top:12px;align-items:center"><label style="flex-direction:row;align-items:center;gap:10px">Custom <input type="color" id="ccol" value="#2f5bff"></label><button id="rs" type="button">Reset</button></div></div>
+<div class="row" style="margin-top:12px;align-items:center"><label style="flex-direction:row;align-items:center;gap:10px">Custom <input type="color" id="ccol" value="#2f5bff"></label></div></div>
+<div><div class="sub" style="margin-bottom:8px">Background colour</div>
+<div class="sw" id="bgsw"></div>
+<div class="row" style="margin-top:12px;align-items:center"><label style="flex-direction:row;align-items:center;gap:10px">Custom <input type="color" id="cbg" value="#f6f7fb"></label></div>
+<p class="sub" style="margin:8px 0 0">Text and cards adjust automatically. Choose Default to follow the theme above.</p></div>
+<button id="rs" type="button">Reset all appearance</button>
 </div></div>
 <div class="card"><h2>Cloud sync</h2>
 <p class="sub" id="syncfull" style="margin:0 0 12px"></p>
@@ -176,18 +181,29 @@ const saveLocal=()=>jset("st:data",D);
 const setSync=t=>{$("sync").textContent=t;$("syncfull").textContent=t};
 /* ---------- Appearance ---------- */
 const ACCENTS=["#2f5bff","#0f9d8a","#2e9e57","#e8590c","#e0457b","#7c4dff","#f2a900","#00a3c4"];
-let prefs=Object.assign({theme:"system",accent:"#2f5bff"},jget("st:prefs",{}));
+let prefs=Object.assign({theme:"system",accent:"#2f5bff",bg:null},jget("st:prefs",{}));
 const mq=window.matchMedia?matchMedia("(prefers-color-scheme: dark)"):{matches:false,addEventListener(){}};
 const lum=h=>{const n=parseInt(h.slice(1),16),c=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+const BGS=["#ffffff","#fbf3e4","#e8f0ff","#e6f6ee","#efe9ff","#ffe9ee","#1e293b","#121212","#0f2a22","#261433"];
+const BGVARS=["--bg","--card","--ink","--muted","--line","--track","--danger","color-scheme"];
+const mix=(a,b,t)=>{const q=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),A=q(a),B=q(b);return"#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("")};
+const contrast=(l1,l2)=>(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05);
 function applyTheme(){
-  const dark=prefs.theme==="dark"||(prefs.theme==="system"&&mq.matches),r=document.documentElement;
+  let dark=prefs.theme==="dark"||(prefs.theme==="system"&&mq.matches);const r=document.documentElement;
+  BGVARS.forEach(v=>r.style.removeProperty(v));
+  if(prefs.bg){
+    const bg=prefs.bg,L=lum(bg);dark=contrast(L,.88)>contrast(L,.011);
+    const ink=dark?"#eef2f8":"#111827",v={"--bg":bg,"--card":dark?mix(bg,"#ffffff",.07):mix(bg,"#ffffff",.65),"--ink":ink,"--muted":mix(ink,bg,.42),"--line":mix(bg,ink,.13),"--track":mix(bg,ink,.1),"--danger":dark?"#ff7a6b":"#d93025","color-scheme":dark?"dark":"light"};
+    Object.keys(v).forEach(k=>r.style.setProperty(k,v[k]));
+  }
   r.dataset.theme=dark?"dark":"light";
   r.style.setProperty("--accent",prefs.accent);r.style.setProperty("--soft",prefs.accent+"1f");
   r.style.setProperty("--on",lum(prefs.accent)>.45?"#0b1220":"#ffffff");
-  document.querySelector('meta[name="theme-color"]').setAttribute("content",dark?"#0b1220":"#f6f7fb");
+  document.querySelector('meta[name="theme-color"]').setAttribute("content",prefs.bg||(dark?"#0b1220":"#f6f7fb"));
   ["light","dark","system"].forEach(t=>$("th-"+t).setAttribute("aria-pressed",prefs.theme===t));
   $("sw").querySelectorAll(".swatch").forEach(b=>b.setAttribute("aria-pressed",b.dataset.c===prefs.accent));
-  $("ccol").value=prefs.accent;
+  $("bgsw").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.c===(prefs.bg||"")));
+  $("ccol").value=prefs.accent;$("cbg").value=prefs.bg||(dark?"#0b1220":"#f6f7fb");
 }
 const savePrefs=()=>{jset("st:prefs",prefs);applyTheme()};
 const TABS=["home","add","hist","set"];
@@ -445,8 +461,11 @@ $("sync").onclick=()=>tab("set");
 ["light","dark","system"].forEach(t=>$("th-"+t).onclick=()=>{prefs.theme=t;savePrefs()});
 $("sw").innerHTML=ACCENTS.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-label="Accent colour ${c}" aria-pressed="false"></button>`).join("");
 $("sw").onclick=e=>{const b=e.target.closest(".swatch");if(b){prefs.accent=b.dataset.c;savePrefs()}};
+$("bgsw").innerHTML='<button type="button" data-c="" aria-pressed="true" style="min-height:36px;padding:4px 12px;border-radius:18px">Default</button>'+BGS.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-label="Background colour ${c}" aria-pressed="false"></button>`).join("");
+$("bgsw").onclick=e=>{const b=e.target.closest("button");if(b){prefs.bg=b.dataset.c||null;savePrefs()}};
+$("cbg").oninput=()=>{prefs.bg=$("cbg").value;savePrefs()};
 $("ccol").oninput=()=>{prefs.accent=$("ccol").value;savePrefs()};
-$("rs").onclick=()=>{prefs={theme:"system",accent:"#2f5bff"};savePrefs()};
+$("rs").onclick=()=>{prefs={theme:"system",accent:"#2f5bff",bg:null};savePrefs()};
 mq.addEventListener&&mq.addEventListener("change",()=>{if(prefs.theme==="system")applyTheme()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});

@@ -3,110 +3,140 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2f5bff">
+<meta name="theme-color" content="#f6f7fb">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Spend Tracker</title>
+<script>try{var p=JSON.parse(localStorage.getItem("st:prefs")||"{}"),d=p.theme==="dark"||((p.theme||"system")==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light"}catch(e){}</script>
 <style>
-:root{--bg:#f1f4f8;--surface:#fff;--ink:#0f1b2d;--muted:#5d6b80;--line:#dbe2ec;--accent:#2f5bff;--on:#fff;--bar:#e6ecf5;--danger:#c0392b}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1522;--surface:#162033;--ink:#e8edf5;--muted:#93a1b8;--line:#26344d;--accent:#6f8dff;--on:#0e1522;--bar:#22304a;--danger:#ff7b6b;color-scheme:dark}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:1.5rem;margin:0 0 8px}h2{font-size:1rem;margin:0 0 12px}
-section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);flex:1 1 140px}
-input,select,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+:root{--bg:#f6f7fb;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e8ebf2;--track:#eceff5;--danger:#d93025;--accent:#2f5bff;--on:#fff;--soft:#2f5bff1f;color-scheme:light}
+:root[data-theme="dark"]{--bg:#0b1220;--card:#131c2e;--ink:#eef2f8;--muted:#94a3b8;--line:#223049;--track:#1f2b42;--danger:#ff7a6b;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(80px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
+main{max-width:640px;margin:0 auto;padding:12px 16px 24px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 16px}
+h1{font-size:1.35rem;margin:0;letter-spacing:-.02em}
+#sync{max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:var(--muted);font-size:.8rem;min-height:32px;padding:4px 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 12px;font-weight:600}
+.sub{color:var(--muted);font-size:.88rem}
+label{display:flex;flex-direction:column;gap:6px;font-size:.82rem;color:var(--muted)}
+input,select,button{font:inherit;color:var(--ink)}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-height:46px;width:100%}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;min-height:44px}
+button.primary{background:var(--accent);color:var(--on);border-color:var(--accent);font-weight:600}
 :is(input,select,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button{cursor:pointer}
-button.primary{background:var(--accent);color:var(--on);border-color:var(--accent);font-weight:700}
-.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{border:0;border-radius:0;background:transparent;flex:1;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on);font-weight:700}
-.nav{display:flex;align-items:center;gap:8px;margin:12px 0}.nav strong{flex:1;text-align:center}
-.total{font-size:2.25rem;font-weight:700;line-height:1.1}
-.sub{color:var(--muted);font-size:.9rem}
-.cat{margin:10px 0}.cat .top{display:flex;justify-content:space-between;font-size:.92rem}
-.track{height:10px;background:var(--bar);border-radius:6px;overflow:hidden;margin-top:4px}
+.stack{display:grid;gap:14px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.amt-in{font-size:2rem;font-weight:700;padding:14px 12px;letter-spacing:-.02em}
+.seg{display:flex;background:var(--track);border-radius:12px;padding:3px}
+.seg button{flex:1;border:0;background:transparent;min-height:38px;color:var(--muted);border-radius:10px;padding:6px 10px}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px #0000001f}
+.nav{display:flex;align-items:center;gap:8px;margin-top:10px}.nav strong{flex:1;text-align:center}
+.nav button{min-width:44px;padding:6px 12px;font-size:1.2rem;border:0;background:var(--track)}
+.total{font-size:2.2rem;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.days{display:flex;align-items:flex-end;gap:3px;height:84px;margin-top:14px}
+.days div{flex:1;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;opacity:.9}
+.daylbl{display:flex;gap:3px;font-size:.7rem;color:var(--muted);margin-top:4px}.daylbl span{flex:1;text-align:center;overflow:hidden}
+.bwrap{display:flex;align-items:center;gap:18px}
+.ring{position:relative;width:112px;height:112px;flex:none}.ring svg{width:100%;height:100%}
+.rt{fill:none;stroke:var(--track);stroke-width:10}.rf{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round}
+.rc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.rc b{font-size:1.4rem}.rc span{font-size:.7rem;color:var(--muted)}
+.bstats{display:grid;gap:10px;flex:1}.big{font-size:1.5rem;font-weight:700;line-height:1.2;letter-spacing:-.02em}
+.over .rf{stroke:var(--danger)}.over .big.l,.over .rc b{color:var(--danger)}
+.brow{display:flex;gap:10px;align-items:flex-end;border-top:1px solid var(--line);padding-top:14px}.brow label{flex:1}
+.cat{margin:12px 0}.cat .top{display:flex;justify-content:space-between;font-size:.92rem;margin:0}
+.track{height:8px;background:var(--track);border-radius:6px;overflow:hidden;margin-top:6px}
 .fill{height:100%;background:var(--accent);border-radius:6px}
-.over .fill{background:var(--danger)}
-.days{display:flex;align-items:flex-end;gap:3px;height:80px;margin-top:8px}
-.days div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
-.daylbl{display:flex;gap:3px;font-size:.7rem;color:var(--muted)}.daylbl span{flex:1;text-align:center;overflow:hidden}
 ul{list-style:none;margin:0;padding:0}
-li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}
-li .meta{flex:1;min-width:0}li small{display:block;color:var(--muted)}li .amt{font-weight:700;white-space:nowrap}
-li button{min-height:36px;padding:4px 10px;color:var(--danger)}
+li{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}li:first-child{border-top:0}
+li .meta{flex:1;min-width:0}li .meta b{font-weight:600}li small{display:block;color:var(--muted)}
+li .amt{font-weight:700;white-space:nowrap}
+li button{min-height:34px;padding:4px 10px;color:var(--danger);border:0;background:transparent;font-size:.85rem}
+.rem{font-style:italic;white-space:pre-wrap;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:12px 0}
-.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bar .sub{flex:1 1 200px}
-.bgrid{display:flex;gap:16px;margin:14px 0 10px}.bgrid>div{flex:1}
-.big{font-size:1.6rem;font-weight:700;line-height:1.2}
-.over .big.l{color:var(--danger)}
-.meta b{font-weight:600}.rem{font-style:italic;white-space:pre-wrap;overflow-wrap:anywhere}
 .bad{border-color:var(--danger)!important}
+.sw{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.swatch{width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;border:3px solid var(--card);box-shadow:0 0 0 1px var(--line)}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2.5px var(--ink)}
+input[type=color]{width:44px;height:36px;min-height:36px;padding:2px;border-radius:10px}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:5}
+.tabs div{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tabs button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.7rem;color:var(--muted);min-height:52px;padding:4px;border-radius:10px}
+.tabs button[aria-current="page"]{color:var(--accent);font-weight:600}
+.tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:6;max-width:90%;text-align:center}
+#toast.on{opacity:1}
 #report{display:none}
-@media print{body{background:#fff!important;color:#111!important;padding:0}body>main{display:none!important}#report{display:block;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111}@page{margin:14mm}#report *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media print{body{background:#fff!important;color:#111!important;padding:0}body>main,.tabs,#toast{display:none!important}#report{display:block;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111}@page{margin:14mm}#report *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
-<h1>Spend Tracker</h1>
-<div class="bar">
-  <span class="sub" id="sync">Saved on this device</span>
-  <button id="signin" type="button" class="primary" hidden>Sign in with Microsoft</button>
-  <button id="gsignin" type="button" class="primary" hidden>Sign in with Google</button>
-  <button id="syncnow" type="button" hidden>Sync now</button>
-  <button id="signout" type="button" hidden>Sign out</button>
+<div class="top"><h1>Spend Tracker</h1><button id="sync" type="button" aria-label="Sync status. Open settings">Saved on this device</button></div>
+
+<div id="periodbar" class="card" style="padding:12px">
+<div class="seg" role="group" aria-label="View"><button id="vw" type="button" aria-pressed="true">Week</button><button id="vm" type="button" aria-pressed="false">Month</button></div>
+<div class="nav"><button id="prev" type="button" aria-label="Previous">‹</button><strong id="range"></strong><button id="next" type="button" aria-label="Next">›</button></div>
 </div>
 
-<section style="margin-top:16px" aria-label="Add expense">
-<h2>Add an expense</h2>
-<div class="row">
-<label>Amount (₹)<input id="amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="150"></label>
+<section id="t-home" aria-label="Home">
+<div class="card"><h2>Monthly budget <span id="bmonth"></span></h2>
+<div id="bud"></div>
+<div class="brow"><label>Budget for each month (₹)<input id="budget" type="number" inputmode="decimal" min="0" placeholder="e.g. 8000"></label><button id="bsave" type="button" class="primary">Save</button></div>
+</div>
+<div class="card" id="spendcard"><h2>Spending</h2>
+<div class="total" id="total">₹0</div><div class="sub" id="avg"></div>
+<div class="days" id="days" aria-hidden="true"></div><div class="daylbl" id="dl" aria-hidden="true"></div>
+</div>
+</section>
+
+<section id="t-add" aria-label="Add expense" hidden>
+<div class="card"><h2>New expense</h2>
+<div class="stack">
+<label>Amount (₹)<input class="amt-in" id="amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></label>
 <label>Category<select id="cat"></select></label>
 <label id="namewrap" hidden>Name this expense (required)<input id="cname" type="text" maxlength="40" placeholder="e.g. Phone repair"></label>
 <label>Date<input id="date" type="date"></label>
 <label>Remarks (optional)<input id="note" type="text" maxlength="120" placeholder="e.g. with friends, bus pass renewal"></label>
-<button class="primary" id="add" type="button" style="flex:1 1 100%">Add expense</button>
-</div>
+<button class="primary" id="add" type="button" style="min-height:50px">Add expense</button>
+</div></div>
 </section>
 
-<section aria-label="Monthly budget">
-<h2>Monthly budget <span class="sub" id="bmonth"></span></h2>
-<div class="row" style="align-items:flex-end">
-<label>My budget for each month (₹)<input id="budget" type="number" inputmode="decimal" min="0" placeholder="e.g. 8000"></label>
-<button id="bsave" type="button" class="primary" style="flex:0 0 auto">Save</button>
-</div>
-<div id="bud"></div>
+<section id="t-hist" aria-label="History" hidden>
+<div class="card"><h2>By category</h2><div id="cats"></div></div>
+<div class="card"><h2>Expenses</h2><ul id="list"></ul></div>
 </section>
 
-<section aria-label="Summary">
-<div class="seg" role="group" aria-label="View">
-<button id="vw" type="button" aria-pressed="true">Week</button>
-<button id="vm" type="button" aria-pressed="false">Month</button>
+<section id="t-set" aria-label="Settings" hidden>
+<div class="card"><h2>Appearance</h2>
+<div class="stack">
+<div><div class="sub" style="margin-bottom:6px">Theme</div>
+<div class="seg" role="group" aria-label="Theme"><button id="th-light" type="button" aria-pressed="false">Light</button><button id="th-dark" type="button" aria-pressed="false">Dark</button><button id="th-system" type="button" aria-pressed="true">System</button></div></div>
+<div><div class="sub" style="margin-bottom:8px">Accent colour</div>
+<div class="sw" id="sw"></div>
+<div class="row" style="margin-top:12px;align-items:center"><label style="flex-direction:row;align-items:center;gap:10px">Custom <input type="color" id="ccol" value="#2f5bff"></label><button id="rs" type="button">Reset</button></div></div>
+</div></div>
+<div class="card"><h2>Cloud sync</h2>
+<p class="sub" id="syncfull" style="margin:0 0 12px"></p>
+<div class="row"><button id="signin" type="button" class="primary" hidden>Sign in with Microsoft</button><button id="gsignin" type="button" class="primary" hidden>Sign in with Google</button><button id="syncnow" type="button" hidden>Sync now</button><button id="signout" type="button" hidden>Sign out</button></div>
 </div>
-<div class="nav"><button id="prev" type="button" aria-label="Previous">‹</button><strong id="range"></strong><button id="next" type="button" aria-label="Next">›</button></div>
-<div class="total" id="total">₹0</div>
-<div class="sub" id="avg"></div>
-<div class="days" id="days" aria-hidden="true"></div>
-<div class="daylbl" id="dl" aria-hidden="true"></div>
-</section>
-
-<section aria-label="By category"><h2>By category</h2><div id="cats"></div></section>
-<section aria-label="Expenses"><h2>Expenses in this period</h2><ul id="list"></ul></section>
-
-<section aria-label="Export">
-<h2>Export</h2>
-<div class="row">
-<button id="pdf" type="button" class="primary">PDF report (with charts)</button>
-<button id="xlsx" type="button">Excel file</button>
-<button id="csv" type="button">CSV</button>
+<div class="card"><h2>Export</h2>
+<div class="row"><button id="pdf" type="button" class="primary">PDF report (with charts)</button><button id="xlsx" type="button">Excel file</button><button id="csv" type="button">CSV</button></div>
+<p class="sub" id="exinfo" style="margin:10px 0 0">The PDF covers the week or month selected on Home or History. Excel and CSV include all your expenses.</p>
 </div>
-<p class="sub" id="exinfo" style="margin:10px 0 0">The PDF covers the week or month shown above. Excel and CSV include all your expenses.</p>
 </section>
 </main>
+
+<nav class="tabs" aria-label="Main"><div>
+<button id="n-home" type="button" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+<button id="n-add" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Add</button>
+<button id="n-hist" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>History</button>
+<button id="n-set" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Settings</button>
+</div></nav>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="report"></div>
 
 <script src="config.js"></script>
@@ -143,7 +173,33 @@ function fillCats(){
   if([...$("cat").options].some(o=>o.value===cur))$("cat").value=cur;
 }
 const saveLocal=()=>jset("st:data",D);
-const setSync=t=>$("sync").textContent=t;
+const setSync=t=>{$("sync").textContent=t;$("syncfull").textContent=t};
+/* ---------- Appearance ---------- */
+const ACCENTS=["#2f5bff","#0f9d8a","#2e9e57","#e8590c","#e0457b","#7c4dff","#f2a900","#00a3c4"];
+let prefs=Object.assign({theme:"system",accent:"#2f5bff"},jget("st:prefs",{}));
+const mq=window.matchMedia?matchMedia("(prefers-color-scheme: dark)"):{matches:false,addEventListener(){}};
+const lum=h=>{const n=parseInt(h.slice(1),16),c=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+function applyTheme(){
+  const dark=prefs.theme==="dark"||(prefs.theme==="system"&&mq.matches),r=document.documentElement;
+  r.dataset.theme=dark?"dark":"light";
+  r.style.setProperty("--accent",prefs.accent);r.style.setProperty("--soft",prefs.accent+"1f");
+  r.style.setProperty("--on",lum(prefs.accent)>.45?"#0b1220":"#ffffff");
+  document.querySelector('meta[name="theme-color"]').setAttribute("content",dark?"#0b1220":"#f6f7fb");
+  ["light","dark","system"].forEach(t=>$("th-"+t).setAttribute("aria-pressed",prefs.theme===t));
+  $("sw").querySelectorAll(".swatch").forEach(b=>b.setAttribute("aria-pressed",b.dataset.c===prefs.accent));
+  $("ccol").value=prefs.accent;
+}
+const savePrefs=()=>{jset("st:prefs",prefs);applyTheme()};
+const TABS=["home","add","hist","set"];
+function tab(n){
+  TABS.forEach(t=>{$("t-"+t).hidden=t!==n;$("n-"+t).setAttribute("aria-current",t===n?"page":"false")});
+  $("periodbar").hidden=!(n==="home"||n==="hist");
+  if(n==="home")$("spendcard").before($("periodbar"));
+  if(n==="hist")$("t-hist").prepend($("periodbar"));
+  window.scrollTo(0,0);
+}
+let toastT=null;
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove("on"),2200)}
 
 /* ---------- Microsoft sign-in (OAuth code flow with PKCE) ---------- */
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
@@ -290,10 +346,10 @@ function renderBudget(){
   const n=new Date(),ms=ds(new Date(n.getFullYear(),n.getMonth(),1)),me=ds(new Date(n.getFullYear(),n.getMonth()+1,0));
   const spent=live().filter(x=>x.date>=ms&&x.date<=me).reduce((t,x)=>t+x.amount,0);
   $("bmonth").textContent="· "+n.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
-  if(!(D.budget>0)){$("bud").className="";$("bud").innerHTML='<p class="sub" style="margin:12px 0 0">Enter your monthly budget above to see how much you have spent and how much is left.</p>';return}
-  const left=D.budget-spent,over=left<0,sp=Math.round(spent/D.budget*100),lp=over?sp-100:100-sp;
+  if(!(D.budget>0)){$("bud").className="";$("bud").innerHTML='<p class="sub" style="margin:0 0 14px">Enter your monthly budget below to see how much you have spent and how much is left.</p>';return}
+  const left=D.budget-spent,over=left<0,sp=Math.round(spent/D.budget*100),lp=over?sp-100:100-sp,C=2*Math.PI*42;
   $("bud").className=over?"over":"";
-  $("bud").innerHTML=`<div class="bgrid"><div><div class="sub">Spent</div><div class="big">${inr(spent)}</div><div class="sub">${sp}% of ${inr(D.budget)}</div></div><div><div class="sub">${over?"Over budget by":"Left"}</div><div class="big l">${inr(Math.abs(left))}</div><div class="sub">${lp}% ${over?"over":"remaining"}</div></div></div><div class="track" role="progressbar" aria-label="Budget used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(sp,100)}"><div class="fill" style="width:${Math.min(sp,100)}%"></div></div>`;
+  $("bud").innerHTML=`<div class="bwrap"><div class="ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="rt" cx="50" cy="50" r="42"/><circle class="rf" cx="50" cy="50" r="42" stroke-dasharray="${C*Math.min(sp,100)/100} ${C}" transform="rotate(-90 50 50)"/></svg><div class="rc"><b>${sp}%</b><span>used</span></div></div><div class="bstats"><div><div class="sub">Spent</div><div class="big">${inr(spent)}</div></div><div><div class="sub">${over?"Over budget by":"Left"}</div><div class="big l">${inr(Math.abs(left))}</div><div class="sub">${lp}% ${over?"over":"remaining"}</div></div></div></div><div class="sub" style="margin:10px 0 14px">of ${inr(D.budget)} monthly budget</div>`;
 }
 function shift(n){
   if(view==="week")anchor.setDate(anchor.getDate()+7*n);else anchor=new Date(anchor.getFullYear(),anchor.getMonth()+n,1);
@@ -312,7 +368,7 @@ $("add").onclick=()=>{
   const it={id,amount,cat,date,note:$("note").value.trim(),at:Date.now()};
   if(cat==="Other")it.name=name;
   D.items.push(it);
-  saveLocal();$("amt").value="";$("note").value="";$("cname").value="";anchor=pd(date);render();$("amt").focus();queue();
+  saveLocal();$("amt").value="";$("note").value="";$("cname").value="";anchor=pd(date);render();$("amt").focus();queue();toast("Added "+inr(amount)+" · "+ecat(it));
 };
 $("list").onclick=e=>{
   const b=e.target.closest("button[data-id]");if(!b)return;
@@ -349,10 +405,10 @@ function pdfReport(){
   const mx=Math.max(...per,1),bw=600/nd;
   const bars=per.map((v,i)=>{const h=v/mx*100,d=new Date(s);d.setDate(s.getDate()+i);
     const lb=nd<=7?d.toLocaleDateString("en-IN",{weekday:"short"}):(i%5===0?d.getDate():"");
-    return `<rect x="${i*bw+bw*.15}" y="${115-h}" width="${bw*.7}" height="${Math.max(h,1)}" fill="#2f5bff" rx="2"/>`+(nd<=7&&v>0?`<text x="${i*bw+bw/2}" y="${111-h}" font-size="11" text-anchor="middle" fill="#111">${inr(v)}</text>`:"")+`<text x="${i*bw+bw/2}" y="132" font-size="11" text-anchor="middle" fill="#555">${lb}</text>`}).join("");
+    return `<rect x="${i*bw+bw*.15}" y="${115-h}" width="${bw*.7}" height="${Math.max(h,1)}" fill="${prefs.accent}" rx="2"/>`+(nd<=7&&v>0?`<text x="${i*bw+bw/2}" y="${111-h}" font-size="11" text-anchor="middle" fill="#111">${inr(v)}</text>`:"")+`<text x="${i*bw+bw/2}" y="132" font-size="11" text-anchor="middle" fill="#555">${lb}</text>`}).join("");
   let bud="";
   if(view==="month"&&D.budget>0){const left=D.budget-total,sp=Math.round(total/D.budget*100);
-    bud=`<p style="margin:6px 0 0">Budget ${inr(D.budget)} · Spent ${inr(total)} (${sp}%) · ${left<0?"Over by "+inr(-left)+" ("+(sp-100)+"%)":"Left "+inr(left)+" ("+(100-sp)+"%)"}</p><div style="height:12px;background:#e6ecf5;border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${Math.min(sp,100)}%;background:${left<0?"#c0392b":"#2f5bff"}"></div></div>`}
+    bud=`<p style="margin:6px 0 0">Budget ${inr(D.budget)} · Spent ${inr(total)} (${sp}%) · ${left<0?"Over by "+inr(-left)+" ("+(sp-100)+"%)":"Left "+inr(left)+" ("+(100-sp)+"%)"}</p><div style="height:12px;background:#e6ecf5;border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${Math.min(sp,100)}%;background:${left<0?"#c0392b":prefs.accent}"></div></div>`}
   const td="padding:6px 8px;border-bottom:1px solid #dbe2ec;vertical-align:top";
   $("report").innerHTML=`<h1 style="font-size:22px;margin:0">${esc(title)}</h1>
   <p style="color:#555;margin:4px 0 14px">Spend Tracker · created ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</p>
@@ -384,10 +440,18 @@ async function xlsx(){
   }catch(err){setSync(err.message)}
 }
 $("pdf").onclick=pdfReport;$("xlsx").onclick=xlsx;
+TABS.forEach(t=>$("n-"+t).onclick=()=>tab(t));
+$("sync").onclick=()=>tab("set");
+["light","dark","system"].forEach(t=>$("th-"+t).onclick=()=>{prefs.theme=t;savePrefs()});
+$("sw").innerHTML=ACCENTS.map(c=>`<button type="button" class="swatch" data-c="${c}" style="background:${c}" aria-label="Accent colour ${c}" aria-pressed="false"></button>`).join("");
+$("sw").onclick=e=>{const b=e.target.closest(".swatch");if(b){prefs.accent=b.dataset.c;savePrefs()}};
+$("ccol").oninput=()=>{prefs.accent=$("ccol").value;savePrefs()};
+$("rs").onclick=()=>{prefs={theme:"system",accent:"#2f5bff"};savePrefs()};
+mq.addEventListener&&mq.addEventListener("change",()=>{if(prefs.theme==="system")applyTheme()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 $("budget").value=D.budget||"";
-render();ui();
+applyTheme();tab("home");render();ui();
 handleReturn().then(()=>{T=jget("st:tok",null);ui();sync()});
 </script>
 </body>

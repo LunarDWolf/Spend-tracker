@@ -1,0 +1,4 @@
+window.APP={
+  microsoftClientId:"PASTE-YOUR-MICROSOFT-CLIENT-ID-HERE",
+  googleClientId:"PASTE-YOUR-GOOGLE-CLIENT-ID-HERE"
+};
